@@ -13,6 +13,26 @@ A CLI tool that watches for changes in files or directories and copies the chang
 
 ## Installation
 
+### Using Homebrew
+
+The easiest way to install CPW on macOS or Linux is via Homebrew:
+
+```bash
+# Add the tap
+brew tap mxvsh/cpw
+
+# Install CPW
+brew install cpw
+```
+
+### From Releases
+You can download pre-built binaries for ARM64 and ARM architectures from the [GitHub Releases](https://github.com/mxvsh/cpw/releases) page.
+
+Available platforms:
+- Linux ARM64 (aarch64)
+- Linux ARM (armv7)
+- macOS ARM64 (Apple Silicon)
+
 ### From Source
 ```bash
 # Clone the repository
@@ -28,14 +48,6 @@ make build VERSION=v1.0.0
 # Optionally move to a directory in your PATH
 cp cpw /usr/local/bin/
 ```
-
-### From Releases
-You can download pre-built binaries for ARM64 and ARM architectures from the [GitHub Releases](https://github.com/mxvsh/cpw/releases) page.
-
-Available platforms:
-- Linux ARM64 (aarch64)
-- Linux ARM (armv7)
-- macOS ARM64 (Apple Silicon)
 
 ## Usage
 
@@ -91,6 +103,7 @@ This project uses GitHub Actions to automatically build and release binaries for
   - Include version information in the builds
   - Create a GitHub release with these binaries
   - Generate release notes
+  - Update the Homebrew formula
 
 ## Dependencies
 
