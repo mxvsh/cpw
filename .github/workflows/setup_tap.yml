@@ -19,7 +19,7 @@ jobs:
         if: ${{ github.event.inputs.create_repo == 'true' }}
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           script: |
             try {
               const { data } = await github.rest.repos.get({
@@ -51,7 +51,7 @@ jobs:
 
       - name: Clone tap repository
         run: |
-          git clone https://github.com/${{ github.repository_owner }}/homebrew-cpw.git tap
+          git clone https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git tap
 
       - name: Create formula directory
         run: |
@@ -66,4 +66,4 @@ jobs:
         run: |
           git add Formula/cpw.rb
           git commit -m "Initial formula setup" || echo "No changes to commit"
-          git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git
+          git push https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git

@@ -46,7 +46,7 @@ jobs:
         run: |
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
-          git clone https://github.com/${{ github.repository_owner }}/homebrew-cpw.git tap
+          git clone https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git tap
 
       - name: Update formula in tap
         run: |
@@ -58,4 +58,4 @@ jobs:
         run: |
           git add Formula/cpw.rb
           git commit -m "Update cpw formula to v${{ env.VERSION }}"
-          git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git
+          git push https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git
