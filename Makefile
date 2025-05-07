@@ -30,14 +30,21 @@ version:
 
 # Setup Homebrew tap (requires GitHub repo access)
 setup-homebrew:
-	@echo "Triggering Homebrew tap setup workflow..."
-	@curl -X POST \
-		-H "Accept: application/vnd.github.v3+json" \
-		-H "Authorization: token $(GITHUB_TOKEN)" \
-		https://api.github.com/repos/$(GITHUB_USER)/cpw/actions/workflows/setup_tap.yml/dispatches \
-		-d '{"ref":"main","inputs":{"create_repo":"true"}}'
-	@echo "\nNote: You need to set GITHUB_TOKEN and GITHUB_USER environment variables."
-	@echo "Example: GITHUB_TOKEN=ghp_xxx GITHUB_USER=mxvsh make setup-homebrew"
+	@echo "IMPORTANT: Before running this target, you need to create a Personal Access Token"
+	@echo "with 'repo' permissions and add it as a secret in your GitHub repository:"
+	@echo "1. Go to GitHub → Settings → Developer settings → Personal access tokens"
+	@echo "2. Create a new token with 'repo' access"
+	@echo "3. Go to your repository → Settings → Secrets → Actions"
+	@echo "4. Add a new secret named HOMEBREW_TAP_TOKEN with your token value"
+	@echo "\nThen you can trigger the workflow manually via GitHub Actions UI"
+	@echo "or using this command:"
+	@echo "\ncurl -X POST \\"
+	@echo "  -H \"Accept: application/vnd.github.v3+json\" \\"
+	@echo "  -H \"Authorization: token YOUR_PAT_HERE\" \\"
+	@echo "  https://api.github.com/repos/$(GITHUB_USER)/cpw/actions/workflows/setup_tap.yml/dispatches \\"
+	@echo "  -d '{\"ref\":\"main\",\"inputs\":{\"create_repo\":\"true\"}}'"
+	@echo "\nRequires GITHUB_USER environment variable to be set."
+	@echo "Example: GITHUB_USER=mxvsh make setup-homebrew"
 
 # Create a new release (Usage: make release version=v1.0.0)
 release:
