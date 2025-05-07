@@ -1,0 +1,93 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [arm64, arm]
+        os: [linux, darwin]
+        include:
+          - os: darwin
+            arch: arm64
+            goos: darwin
+            goarch: arm64
+          - os: linux
+            arch: arm64
+            goos: linux
+            goarch: arm64
+          - os: linux
+            arch: arm
+            goos: linux
+            goarch: arm
+            goarm: 7
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          echo "COMMIT_SHA=$COMMIT_SHA" >> $GITHUB_ENV
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        run: |
+          output_name="cpw-${{ matrix.goos }}-${{ matrix.arch }}"
+          if [[ "${{ matrix.goarm }}" != "" ]]; then
+            output_name="${output_name}v${{ matrix.goarm }}"
+          fi
+
+          go build -v -ldflags "-X main.Version=$VERSION -X main.CommitSHA=$COMMIT_SHA -X main.BuildDate=$BUILD_DATE" -o "${output_name}"
+          ls -la
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: cpw-${{ matrix.goos }}-${{ matrix.arch }}${{ matrix.goarm }}
+          path: cpw-${{ matrix.goos }}-${{ matrix.arch }}${{ matrix.goarm != '' && 'v' || '' }}${{ matrix.goarm }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R ./artifacts
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./artifacts/*/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
