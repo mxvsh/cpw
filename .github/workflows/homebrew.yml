@@ -1,0 +1,61 @@
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up environment
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+          echo "DARWIN_ARM64_URL=https://github.com/mxvsh/cpw/releases/download/${GITHUB_REF#refs/tags/}/cpw-darwin-arm64" >> $GITHUB_ENV
+          echo "LINUX_ARM64_URL=https://github.com/mxvsh/cpw/releases/download/${GITHUB_REF#refs/tags/}/cpw-linux-arm64" >> $GITHUB_ENV
+          echo "LINUX_ARM_URL=https://github.com/mxvsh/cpw/releases/download/${GITHUB_REF#refs/tags/}/cpw-linux-armv7" >> $GITHUB_ENV
+
+      - name: Download binaries and calculate checksums
+        run: |
+          mkdir -p ./bin
+          curl -L $DARWIN_ARM64_URL -o ./bin/cpw-darwin-arm64
+          curl -L $LINUX_ARM64_URL -o ./bin/cpw-linux-arm64
+          curl -L $LINUX_ARM_URL -o ./bin/cpw-linux-armv7
+
+          DARWIN_ARM64_SHA256=$(sha256sum ./bin/cpw-darwin-arm64 | awk '{print $1}')
+          LINUX_ARM64_SHA256=$(sha256sum ./bin/cpw-linux-arm64 | awk '{print $1}')
+          LINUX_ARM_SHA256=$(sha256sum ./bin/cpw-linux-armv7 | awk '{print $1}')
+
+          echo "DARWIN_ARM64_SHA256=$DARWIN_ARM64_SHA256" >> $GITHUB_ENV
+          echo "LINUX_ARM64_SHA256=$LINUX_ARM64_SHA256" >> $GITHUB_ENV
+          echo "LINUX_ARM_SHA256=$LINUX_ARM_SHA256" >> $GITHUB_ENV
+
+      - name: Update Homebrew formula
+        run: |
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" Formula/cpw.rb
+          sed -i "s/SHA256_PLACEHOLDER_DARWIN_ARM64/$DARWIN_ARM64_SHA256/g" Formula/cpw.rb
+          sed -i "s/SHA256_PLACEHOLDER_LINUX_ARM64/$LINUX_ARM64_SHA256/g" Formula/cpw.rb
+          sed -i "s/SHA256_PLACEHOLDER_LINUX_ARM/$LINUX_ARM_SHA256/g" Formula/cpw.rb
+
+          cat Formula/cpw.rb
+
+      - name: Clone tap repository
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git clone https://github.com/${{ github.repository_owner }}/homebrew-cpw.git tap
+
+      - name: Update formula in tap
+        run: |
+          mkdir -p tap/Formula
+          cp Formula/cpw.rb tap/Formula/
+
+      - name: Commit and push to tap
+        working-directory: ./tap
+        run: |
+          git add Formula/cpw.rb
+          git commit -m "Update cpw formula to v${{ env.VERSION }}"
+          git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git
