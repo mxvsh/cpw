@@ -1,4 +1,4 @@
-.PHONY: build clean test release version
+.PHONY: build clean test release version setup-homebrew
 
 # Version information
 VERSION ?= dev
@@ -28,6 +28,17 @@ version:
 	@echo "Commit: $(COMMIT_SHA)"
 	@echo "Build Date: $(BUILD_DATE)"
 
+# Setup Homebrew tap (requires GitHub repo access)
+setup-homebrew:
+	@echo "Triggering Homebrew tap setup workflow..."
+	@curl -X POST \
+		-H "Accept: application/vnd.github.v3+json" \
+		-H "Authorization: token $(GITHUB_TOKEN)" \
+		https://api.github.com/repos/$(GITHUB_USER)/cpw/actions/workflows/setup_tap.yml/dispatches \
+		-d '{"ref":"main","inputs":{"create_repo":"true"}}'
+	@echo "\nNote: You need to set GITHUB_TOKEN and GITHUB_USER environment variables."
+	@echo "Example: GITHUB_TOKEN=ghp_xxx GITHUB_USER=mxvsh make setup-homebrew"
+
 # Create a new release (Usage: make release version=v1.0.0)
 release:
 	@if [ -z "$(version)" ]; then \
@@ -52,4 +63,5 @@ help:
 	@echo "  make test              - Run tests"
 	@echo "  make version           - Display version information"
 	@echo "  make release version=v1.0.0 - Create and push a new release tag"
+	@echo "  make setup-homebrew    - Setup Homebrew tap repository (requires GitHub token)"
 	@echo "  make help              - Show this help message" 
