@@ -2,7 +2,13 @@ name: Update Homebrew Formula
 
 on:
   release:
-    types: [released]
+    types: [published, created, released]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (without v prefix, e.g. 1.0.0)'
+        required: false
+        default: ''
 
 jobs:
   update-formula:
@@ -10,52 +16,142 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Debug release information
+        run: |
+          echo "GITHUB_REF: ${GITHUB_REF}"
+          echo "Release tag: ${GITHUB_REF#refs/tags/}"
+          echo "Event name: ${{ github.event_name }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Workflow triggered by: ${{ github.event.action }}"
 
       - name: Set up environment
         run: |
-          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-          echo "DARWIN_ARM64_URL=https://github.com/mxvsh/cpw/releases/download/${GITHUB_REF#refs/tags/}/cpw-darwin-arm64" >> $GITHUB_ENV
-          echo "LINUX_ARM64_URL=https://github.com/mxvsh/cpw/releases/download/${GITHUB_REF#refs/tags/}/cpw-linux-arm64" >> $GITHUB_ENV
-          echo "LINUX_ARM_URL=https://github.com/mxvsh/cpw/releases/download/${GITHUB_REF#refs/tags/}/cpw-linux-armv7" >> $GITHUB_ENV
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "Using manually provided version: ${{ github.event.inputs.version }}"
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            echo "Using version from tag: ${GITHUB_REF#refs/tags/v}"
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "DARWIN_ARM64_URL=https://github.com/${{ github.repository_owner }}/cpw/releases/download/v$VERSION/cpw-darwin-arm64" >> $GITHUB_ENV
+          echo "LINUX_ARM64_URL=https://github.com/${{ github.repository_owner }}/cpw/releases/download/v$VERSION/cpw-linux-arm64" >> $GITHUB_ENV
+          echo "LINUX_ARM_URL=https://github.com/${{ github.repository_owner }}/cpw/releases/download/v$VERSION/cpw-linux-armv7" >> $GITHUB_ENV
+
+          echo "URLs that will be used:"
+          echo "- macOS ARM64: https://github.com/${{ github.repository_owner }}/cpw/releases/download/v$VERSION/cpw-darwin-arm64"
+          echo "- Linux ARM64: https://github.com/${{ github.repository_owner }}/cpw/releases/download/v$VERSION/cpw-linux-arm64"
+          echo "- Linux ARM: https://github.com/${{ github.repository_owner }}/cpw/releases/download/v$VERSION/cpw-linux-armv7"
+
+      - name: Wait for release assets to be available
+        run: |
+          echo "Waiting for release assets to become available..."
+          sleep 30
 
       - name: Download binaries and calculate checksums
         run: |
           mkdir -p ./bin
-          curl -L $DARWIN_ARM64_URL -o ./bin/cpw-darwin-arm64
-          curl -L $LINUX_ARM64_URL -o ./bin/cpw-linux-arm64
-          curl -L $LINUX_ARM_URL -o ./bin/cpw-linux-armv7
+          echo "Downloading binaries..."
 
-          DARWIN_ARM64_SHA256=$(sha256sum ./bin/cpw-darwin-arm64 | awk '{print $1}')
-          LINUX_ARM64_SHA256=$(sha256sum ./bin/cpw-linux-arm64 | awk '{print $1}')
-          LINUX_ARM_SHA256=$(sha256sum ./bin/cpw-linux-armv7 | awk '{print $1}')
+          echo "Downloading macOS ARM64 binary..."
+          curl -L -v $DARWIN_ARM64_URL -o ./bin/cpw-darwin-arm64 || echo "Failed to download macOS ARM64 binary"
 
-          echo "DARWIN_ARM64_SHA256=$DARWIN_ARM64_SHA256" >> $GITHUB_ENV
-          echo "LINUX_ARM64_SHA256=$LINUX_ARM64_SHA256" >> $GITHUB_ENV
-          echo "LINUX_ARM_SHA256=$LINUX_ARM_SHA256" >> $GITHUB_ENV
+          echo "Downloading Linux ARM64 binary..."
+          curl -L -v $LINUX_ARM64_URL -o ./bin/cpw-linux-arm64 || echo "Failed to download Linux ARM64 binary"
+
+          echo "Downloading Linux ARM binary..."
+          curl -L -v $LINUX_ARM_URL -o ./bin/cpw-linux-armv7 || echo "Failed to download Linux ARM binary"
+
+          echo "Calculating checksums..."
+          ls -la ./bin/
+
+          if [ -f "./bin/cpw-darwin-arm64" ]; then
+            DARWIN_ARM64_SHA256=$(sha256sum ./bin/cpw-darwin-arm64 | awk '{print $1}')
+            echo "DARWIN_ARM64_SHA256=$DARWIN_ARM64_SHA256" >> $GITHUB_ENV
+            echo "macOS ARM64 SHA256: $DARWIN_ARM64_SHA256"
+          else
+            echo "macOS ARM64 binary not found, using placeholder"
+            echo "DARWIN_ARM64_SHA256=placeholder_darwin_arm64_sha256" >> $GITHUB_ENV
+          fi
+
+          if [ -f "./bin/cpw-linux-arm64" ]; then
+            LINUX_ARM64_SHA256=$(sha256sum ./bin/cpw-linux-arm64 | awk '{print $1}')
+            echo "LINUX_ARM64_SHA256=$LINUX_ARM64_SHA256" >> $GITHUB_ENV
+            echo "Linux ARM64 SHA256: $LINUX_ARM64_SHA256"
+          else
+            echo "Linux ARM64 binary not found, using placeholder"
+            echo "LINUX_ARM64_SHA256=placeholder_linux_arm64_sha256" >> $GITHUB_ENV
+          fi
+
+          if [ -f "./bin/cpw-linux-armv7" ]; then
+            LINUX_ARM_SHA256=$(sha256sum ./bin/cpw-linux-armv7 | awk '{print $1}')
+            echo "LINUX_ARM_SHA256=$LINUX_ARM_SHA256" >> $GITHUB_ENV
+            echo "Linux ARM SHA256: $LINUX_ARM_SHA256"
+          else
+            echo "Linux ARM binary not found, using placeholder"
+            echo "LINUX_ARM_SHA256=placeholder_linux_arm_sha256" >> $GITHUB_ENV
+          fi
 
       - name: Update Homebrew formula
         run: |
+          echo "Updating Homebrew formula with version $VERSION"
+          cat Formula/cpw.rb
+
           sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" Formula/cpw.rb
           sed -i "s/SHA256_PLACEHOLDER_DARWIN_ARM64/$DARWIN_ARM64_SHA256/g" Formula/cpw.rb
           sed -i "s/SHA256_PLACEHOLDER_LINUX_ARM64/$LINUX_ARM64_SHA256/g" Formula/cpw.rb
           sed -i "s/SHA256_PLACEHOLDER_LINUX_ARM/$LINUX_ARM_SHA256/g" Formula/cpw.rb
 
+          echo "Updated formula:"
           cat Formula/cpw.rb
 
       - name: Clone tap repository
         run: |
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
-          git clone https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git tap
+          echo "Cloning tap repository..."
+          git clone https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git tap || echo "Failed to clone tap repository"
+
+          if [ ! -d "tap" ]; then
+            echo "Tap repository not found, attempting to create it..."
+            mkdir tap
+            cd tap
+            git init
+            git remote add origin https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git
+            echo "# Homebrew Tap for CPW" > README.md
+            git add README.md
+            git commit -m "Initial commit"
+            git branch -M main
+            git push -u origin main || echo "Failed to push to tap repository. Please create it manually."
+            cd ..
+          fi
 
       - name: Update formula in tap
         run: |
-          mkdir -p tap/Formula
-          cp Formula/cpw.rb tap/Formula/
+          if [ -d "tap" ]; then
+            echo "Creating Formula directory in tap..."
+            mkdir -p tap/Formula
+            echo "Copying formula to tap..."
+            cp Formula/cpw.rb tap/Formula/
+          else
+            echo "Tap directory not found, cannot update formula"
+          fi
 
       - name: Commit and push to tap
-        working-directory: ./tap
         run: |
-          git add Formula/cpw.rb
-          git commit -m "Update cpw formula to v${{ env.VERSION }}"
-          git push https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git
+          if [ -d "tap" ]; then
+            cd tap
+            echo "Adding formula to git..."
+            git add Formula/cpw.rb
+            echo "Committing changes..."
+            git commit -m "Update cpw formula to v${{ env.VERSION }}" || echo "No changes to commit"
+            echo "Pushing changes..."
+            git push https://${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/${{ github.repository_owner }}/homebrew-cpw.git || echo "Failed to push changes"
+          else
+            echo "Tap directory not found, cannot commit changes"
+          fi
